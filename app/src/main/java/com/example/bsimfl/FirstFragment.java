@@ -38,13 +38,17 @@ import java.util.List;
 public class FirstFragment extends Fragment {
 
     private final String dataFile = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1.csv";
+    private final String rawDataFile = "raw/" + dataFile;
     private final String file_x_train = "data/x_train/" + dataFile;
     private final String file_x_test = "data/x_test/" + dataFile;
     private final String file_y_train = "data/y_train/" + dataFile;
     private final String file_y_test = "data/y_test/" + dataFile;
-    int batchSize = 20 ;
     DataSet trainingData;
     DataSet testData;
+    private int batchSize = 20 ;
+    private int features = 54;
+    private int classes = 10;
+
 
     @Override
     public View onCreateView(
@@ -71,6 +75,7 @@ public class FirstFragment extends Fragment {
             @Override
             public void run() {
                 // TODO Probar la carga de datos
+                // Obtener datos
                 try {
                     createDataSource(file_x_train);
                 } catch (IOException e) {
@@ -81,7 +86,7 @@ public class FirstFragment extends Fragment {
                     e.printStackTrace();
                 }
                 // TODO probar la creación de la red
-                //createAndUseNetwork();
+                createAndUseNetwork();
             }
         });
     }
@@ -89,12 +94,10 @@ public class FirstFragment extends Fragment {
     private void createAndUseNetwork() {
         // Variables
         int seed = 9;
-        int features = 54;
-        int classes = 10;
         int epochs = 5;
         double lr = 0.015;
         double momentum = 0.9;
-
+        Log.i("createAndUseNetwork: ", "1) Creating layers");
         // Layers
         DenseLayer inputLayer = new DenseLayer.Builder()
                 .nIn(features)
@@ -118,6 +121,7 @@ public class FirstFragment extends Fragment {
                 .build();
 
         // Configuracion
+        Log.i("createAndUseNetwork: ", "2) Creating configuration");
         MultiLayerConfiguration multiLayerConf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
                 .weightInit(WeightInit.XAVIER)
@@ -130,10 +134,12 @@ public class FirstFragment extends Fragment {
                 .build();
         // TODO Como activar la backpropagation?
         // Model
+        Log.i("createAndUseNetwork: ", "3) Creating model");
         MultiLayerNetwork model = new MultiLayerNetwork(multiLayerConf);
         model.init();
 
         // Resumen
+        Log.i("createAndUseNetwork: ", "4) Summary");
         Log.i("NETWORK", "createAndUseNetwork: " + model.summary());
     }
 
@@ -141,8 +147,10 @@ public class FirstFragment extends Fragment {
     private void createDataSource(String dataFile) throws IOException, InterruptedException {
         //Pre: Create input stream
         Log.i("createDataSource: ", "0) Creando input stream");
+        Log.i("createDataSource: ", "Ruta: "+dataFile);
         AssetManager am = this.getContext().getAssets();
         InputStream is = am.open(dataFile);
+        Log.i("createDataSource", is.toString());
 
         //First: get the dataset using the record reader. CSVRecordReader handles loading/parsing
         Log.i("createDataSource: ", "1) Creando record reader");
@@ -152,12 +160,21 @@ public class FirstFragment extends Fragment {
         recordReader.initialize(new InputStreamInputSplit(is));
 
         //Second: the RecordReaderDataSetIterator handles conversion to DataSet objects, ready for use in neural network
-        int labelIndex = 5;
+        int labelIndex = 0;
+        Log.i("createDataSource: ", "2) Creando iterador");
+//        DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, labelIndex, labelIndex, true);
+//        DataSet allData = iterator.next();
 
-        DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, labelIndex, labelIndex, true);
+        DataSetIterator iterator = new RecordReaderDataSetIterator.Builder(recordReader, batchSize)
+                //Label index (first arg): Always value 1 when using ImageRecordReader. For CSV etc: use index of the column
+                //  that contains the label (should contain an integer value, 0 to nClasses-1 inclusive). Column indexes start
+                // at 0. Number of classes (second arg): number of label classes (i.e., 10 for MNIST - 10 digits)
+                .classification(labelIndex, classes)
+                .build();
         DataSet allData = iterator.next();
 
         // Dividir en train test
+        Log.i("createDataSource: ", "3) Test y Train");
         SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.50);  //Use 50% of data for training
 
         trainingData = testAndTrain.getTrain();
@@ -199,3 +216,14 @@ public class FirstFragment extends Fragment {
 //        return questionList;
 //    }
 }
+//Example 1: Image classification, batch size 32, 10 classes
+//        RecordReader rr = new ImageRecordReader(28,28,3); //28x28 RGB images
+//        rr.initialize(new FileSplit(new File("/path/to/directory")));
+//
+//        DataSetIterator iter = new RecordReaderDataSetIterator.Builder(rr, 32)
+//        //Label index (first arg): Always value 1 when using ImageRecordReader. For CSV etc: use index of the column
+//        //  that contains the label (should contain an integer value, 0 to nClasses-1 inclusive). Column indexes start
+//        // at 0. Number of classes (second arg): number of label classes (i.e., 10 for MNIST - 10 digits)
+//        .classification(1, nClasses)
+//        .preProcessor(new ImagePreProcessingScaler())      //For normalization of image values 0-255 to 0-1
+//        .build()
