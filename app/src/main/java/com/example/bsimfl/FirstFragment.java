@@ -24,7 +24,9 @@ import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
+import org.nd4j.evaluation.classification.Evaluation;
 import org.nd4j.linalg.activations.Activation;
+import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.SplitTestAndTrain;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
@@ -46,6 +48,7 @@ public class FirstFragment extends Fragment {
     private final String file_y_test = "data/y_test/" + dataFile;
     DataSet trainingData;
     DataSet testData;
+    MultiLayerNetwork model;
     private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
     private final int features = 54;
     private final int classes = 10;
@@ -86,8 +89,11 @@ public class FirstFragment extends Fragment {
                     Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
                     e.printStackTrace();
                 }
-                // TODO probar la creación de la red
+                // TODO Probar el entrenamiento de la red
                 createAndUseNetwork();
+
+                // TODO Probar la evaluación de la red
+                evaluateNetwork();
             }
         });
     }
@@ -134,7 +140,7 @@ public class FirstFragment extends Fragment {
         // TODO Como activar la backpropagation?
         // Model
         Log.i("createAndUseNetwork: ", "3) Creating model");
-        MultiLayerNetwork model = new MultiLayerNetwork(multiLayerConf);
+        model = new MultiLayerNetwork(multiLayerConf);
         model.init();
 
         // Resumen
@@ -142,9 +148,26 @@ public class FirstFragment extends Fragment {
         Log.i("NETWORK", "createAndUseNetwork: " + model.summary());
 
         // Training loop
+        Log.i("NETWORK", "Entering training loop...");
         for(int l=0; l<=epochs; l++) {
             model.fit(trainingData);
         }
+        Log.i("NETWORK", "Training loop finished.");
+    }
+
+    private void evaluateNetwork() {
+        // Evaluation
+//        DataSetIterator dataSetIterator = testData.iterateWithMiniBatches();
+//        Evaluation eval = model.evaluate(dataSetIterator);
+        Log.i("evaluateNetwork: ", "Starting evaluation process");
+        Evaluation eval = new Evaluation(classes);
+        INDArray output = model.output(testData.getFeatures());
+        eval.eval(testData.getLabels(), output);
+        Log.i("evaluateNetwork: ", eval.stats());
+        Log.i("evaluateNetwork: ", "Confusion matrix:\n" + eval.confusionToString());
+
+        Log.i("evaluateNetwork: ", "End of evaluation");
+
 
     }
 
@@ -196,12 +219,6 @@ public class FirstFragment extends Fragment {
 
         Log.i("createDataSource: ", "Fin de la carga.");
 
-        // No haria falta normalizar, ya se hizo en el preprocesado en Python.
-        //We need to normalize our data. We'll use NormalizeStandardize (which gives us mean 0, unit variance):
-//        DataNormalization normalizer = new NormalizerStandardize();
-//        normalizer.fit(trainingData);           //Collect the statistics (mean/stdev) from the training data. This does not modify the input data
-//        normalizer.transform(trainingData);     //Apply normalization to the training data
-//        normalizer.transform(testData);         //Apply normalization to the test data. This is using statistics calculated from the *training* set
     }
 
 
