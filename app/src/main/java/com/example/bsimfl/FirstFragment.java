@@ -38,16 +38,21 @@ import java.util.List;
 public class FirstFragment extends Fragment {
 
     private final String dataFile = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1.csv";
-    private final String rawDataFile = "raw/" + dataFile;
+    private final String ordinalDataFile = "data/ordinal/" + dataFile;
+    private final String oneHotDataFile = "data/one_hot/" + dataFile; // Labels empiezan en col 55
     private final String file_x_train = "data/x_train/" + dataFile;
     private final String file_x_test = "data/x_test/" + dataFile;
     private final String file_y_train = "data/y_train/" + dataFile;
     private final String file_y_test = "data/y_test/" + dataFile;
     DataSet trainingData;
     DataSet testData;
-    private int batchSize = 20 ;
-    private int features = 54;
-    private int classes = 10;
+    private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
+    private final int features = 54;
+    private final int classes = 10;
+    private final double fractionTrain = 0.5;
+    private final int epochs = 50;
+    private final double lr = 0.015;
+    private final double momentum = 0.9;
 
 
     @Override
@@ -74,14 +79,10 @@ public class FirstFragment extends Fragment {
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {
-                // TODO Probar la carga de datos
                 // Obtener datos
                 try {
-                    createDataSource(file_x_train);
-                } catch (IOException e) {
-                    Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
+                    createDataSource(ordinalDataFile); //TODO Cambiar este fichero
+                } catch (IOException | InterruptedException e) {
                     Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
                     e.printStackTrace();
                 }
@@ -94,9 +95,7 @@ public class FirstFragment extends Fragment {
     private void createAndUseNetwork() {
         // Variables
         int seed = 9;
-        int epochs = 5;
-        double lr = 0.015;
-        double momentum = 0.9;
+
         Log.i("createAndUseNetwork: ", "1) Creating layers");
         // Layers
         DenseLayer inputLayer = new DenseLayer.Builder()
@@ -113,7 +112,7 @@ public class FirstFragment extends Fragment {
                 .activation(Activation.RELU)
                 .build();
 
-        OutputLayer outputLayer = new OutputLayer.Builder(LossFunctions.LossFunction.XENT)
+        OutputLayer outputLayer = new OutputLayer.Builder(LossFunctions.LossFunction.MSE) // Mean Square Error obligada con activacion ReLU
                 .nIn(54)
                 .nOut(classes)
                 .weightInit(WeightInit.XAVIER)
@@ -141,6 +140,12 @@ public class FirstFragment extends Fragment {
         // Resumen
         Log.i("createAndUseNetwork: ", "4) Summary");
         Log.i("NETWORK", "createAndUseNetwork: " + model.summary());
+
+        // Training loop
+        for(int l=0; l<=epochs; l++) {
+            model.fit(trainingData);
+        }
+
     }
 
     // TODO CSV con CSVwriter
@@ -160,7 +165,7 @@ public class FirstFragment extends Fragment {
         recordReader.initialize(new InputStreamInputSplit(is));
 
         //Second: the RecordReaderDataSetIterator handles conversion to DataSet objects, ready for use in neural network
-        int labelIndex = 0;
+        int labelIndex = 0; // Las acciones estan en la primera columna
         Log.i("createDataSource: ", "2) Creando iterador");
 //        DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, labelIndex, labelIndex, true);
 //        DataSet allData = iterator.next();
@@ -175,16 +180,23 @@ public class FirstFragment extends Fragment {
 
         // Dividir en train test
         Log.i("createDataSource: ", "3) Test y Train");
-        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.50);  //Use 50% of data for training
+        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(fractionTrain);  //Use 50% of data for training
 
         trainingData = testAndTrain.getTrain();
         testData = testAndTrain.getTest();
 
-        // TODO Comprobar y borrar luego
+        Log.i("createDataSource: ", "Features train: " + trainingData.getFeatures().toString());
+        Log.i("createDataSource: ", "Labels train: " + trainingData.getLabels().toString());
+        Log.i("createDataSource: ", "N samples train: " + trainingData.numExamples());
+        Log.i("createDataSource: ", "Label Names: " + trainingData.getLabelNames().toString());
+        Log.i("createDataSource: ", "N Examples train: " + trainingData.numExamples());
+
         Log.i("createDataSource: ", "DATASET DE ENTRENAMIENTO: " + trainingData.toString());
         Log.i("createDataSource: ", "DATASET DE TESTEO: " + testData.toString());
 
-        // En principio no haria falta normalizar, ya se hizo en el preprocesado en Python.
+        Log.i("createDataSource: ", "Fin de la carga.");
+
+        // No haria falta normalizar, ya se hizo en el preprocesado en Python.
         //We need to normalize our data. We'll use NormalizeStandardize (which gives us mean 0, unit variance):
 //        DataNormalization normalizer = new NormalizerStandardize();
 //        normalizer.fit(trainingData);           //Collect the statistics (mean/stdev) from the training data. This does not modify the input data
