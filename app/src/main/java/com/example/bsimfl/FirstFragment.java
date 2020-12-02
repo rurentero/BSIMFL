@@ -125,6 +125,7 @@ public class FirstFragment extends Fragment {
                 .activation(Activation.RELU)
                 .build();
 
+        // TODO Cambiar la configuración para mejorar el modelo
         // Configuracion
         Log.i("createAndUseNetwork: ", "2) Creating configuration");
         MultiLayerConfiguration multiLayerConf = new NeuralNetConfiguration.Builder()
@@ -171,7 +172,6 @@ public class FirstFragment extends Fragment {
 
     }
 
-    // TODO CSV con CSVwriter
     private void createDataSource(String dataFile) throws IOException, InterruptedException {
         //Pre: Create input stream
         Log.i("createDataSource: ", "0) Creando input stream");
@@ -190,8 +190,6 @@ public class FirstFragment extends Fragment {
         //Second: the RecordReaderDataSetIterator handles conversion to DataSet objects, ready for use in neural network
         int labelIndex = 0; // Las acciones estan en la primera columna
         Log.i("createDataSource: ", "2) Creando iterador");
-//        DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, labelIndex, labelIndex, true);
-//        DataSet allData = iterator.next();
 
         DataSetIterator iterator = new RecordReaderDataSetIterator.Builder(recordReader, batchSize)
                 //Label index (first arg): Always value 1 when using ImageRecordReader. For CSV etc: use index of the column
@@ -221,38 +219,4 @@ public class FirstFragment extends Fragment {
 
     }
 
-
-    // TODO APLAZADO Leer el CSV y devolver lista de arrays (contenido de cada columna)
-//    private static void get_train_data() {
-//        List<Integer[]> questionList = new ArrayList<String[]>();
-//        AssetManager assetManager = context.getAssets();
-//
-//        try {
-//            InputStream csvStream = assetManager.open(CSV_PATH);
-//            InputStreamReader csvStreamReader = new InputStreamReader(csvStream);
-//            CSVReader csvReader = new CSVReader(csvStreamReader);
-//            String[] line;
-//
-//            // throw away the header
-//            csvReader.readNext();
-//
-//            while ((line = csvReader.readNext()) != null) {
-//                questionList.add(line);
-//            }
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//        return questionList;
-//    }
 }
-//Example 1: Image classification, batch size 32, 10 classes
-//        RecordReader rr = new ImageRecordReader(28,28,3); //28x28 RGB images
-//        rr.initialize(new FileSplit(new File("/path/to/directory")));
-//
-//        DataSetIterator iter = new RecordReaderDataSetIterator.Builder(rr, 32)
-//        //Label index (first arg): Always value 1 when using ImageRecordReader. For CSV etc: use index of the column
-//        //  that contains the label (should contain an integer value, 0 to nClasses-1 inclusive). Column indexes start
-//        // at 0. Number of classes (second arg): number of label classes (i.e., 10 for MNIST - 10 digits)
-//        .classification(1, nClasses)
-//        .preProcessor(new ImagePreProcessingScaler())      //For normalization of image values 0-255 to 0-1
-//        .build()
