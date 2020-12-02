@@ -35,6 +35,8 @@ import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class FirstFragment extends Fragment {
@@ -52,10 +54,12 @@ public class FirstFragment extends Fragment {
     private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
     private final int features = 54;
     private final int classes = 10;
-    private final double fractionTrain = 0.5;
-    private final int epochs = 50;
+    private final double fractionTrain = 0.75;
+    private final int epochs = 100;
     private final double lr = 0.015;
     private final double momentum = 0.9;
+    private final List<String> labelList = new ArrayList<String>(Arrays.asList("turn off","turn on","Antena3","pop","FDF","70W","TeleCinco","20C","rock","18C"));
+
 
 
     @Override
@@ -84,15 +88,15 @@ public class FirstFragment extends Fragment {
             public void run() {
                 // Obtener datos
                 try {
-                    createDataSource(ordinalDataFile); //TODO Cambiar este fichero
+                    createDataSource(ordinalDataFile);
                 } catch (IOException | InterruptedException e) {
                     Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
                     e.printStackTrace();
                 }
-                // TODO Probar el entrenamiento de la red
+                // Create and train network
                 createAndUseNetwork();
 
-                // TODO Probar la evaluación de la red
+                // Evaluates network
                 evaluateNetwork();
             }
         });
@@ -133,12 +137,14 @@ public class FirstFragment extends Fragment {
                 .weightInit(WeightInit.XAVIER)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .updater(new Sgd(lr))
+                //.weightDecay(momentum)
                 .list()
                 .layer(0, inputLayer)
                 .layer(1, hiddenLayer)
                 .layer(2, outputLayer)
+                .backpropType(BackpropType.Standard) // For most MLPs
                 .build();
-        // TODO Como activar la backpropagation?
+
         // Model
         Log.i("createAndUseNetwork: ", "3) Creating model");
         model = new MultiLayerNetwork(multiLayerConf);
@@ -157,19 +163,16 @@ public class FirstFragment extends Fragment {
     }
 
     private void evaluateNetwork() {
-        // Evaluation
-//        DataSetIterator dataSetIterator = testData.iterateWithMiniBatches();
-//        Evaluation eval = model.evaluate(dataSetIterator);
         Log.i("evaluateNetwork: ", "Starting evaluation process");
         Evaluation eval = new Evaluation(classes);
+        eval.setLabelsList(labelList); // Set label literals
+
         INDArray output = model.output(testData.getFeatures());
         eval.eval(testData.getLabels(), output);
         Log.i("evaluateNetwork: ", eval.stats());
         Log.i("evaluateNetwork: ", "Confusion matrix:\n" + eval.confusionToString());
 
         Log.i("evaluateNetwork: ", "End of evaluation");
-
-
     }
 
     private void createDataSource(String dataFile) throws IOException, InterruptedException {
@@ -201,7 +204,7 @@ public class FirstFragment extends Fragment {
 
         // Dividir en train test
         Log.i("createDataSource: ", "3) Test y Train");
-        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(fractionTrain);  //Use 50% of data for training
+        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(fractionTrain);
 
         trainingData = testAndTrain.getTrain();
         testData = testAndTrain.getTest();
