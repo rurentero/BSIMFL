@@ -30,7 +30,7 @@
         android:id="@+id/editTextTextPersonName4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="2dp"
         android:ems="10"
         android:inputType="textPersonName"
         android:text="Log"
@@ -38,27 +38,37 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView_steps" />
 
+    <ScrollView
+        android:id="@+id/scrollView_log"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/editTextTextPersonName4"
+        app:layout_constraintBottom_toTopOf="@id/editTextTextPersonName5"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintHeight_max="250dp">
+
     <TextView
         android:id="@+id/textView_log"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:isScrollContainer="true"
-        android:textAlignment="viewStart"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/editTextTextPersonName4" />
+        android:textAlignment="viewStart" />
+
+    </ScrollView>
 
     <EditText
         android:id="@+id/editTextTextPersonName5"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="2dp"
         android:ems="10"
         android:inputType="textPersonName"
         android:text="Metrics"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView_log" />
+        app:layout_constraintTop_toBottomOf="@+id/scrollView_log" />
 
     <TextView
         android:id="@+id/textView_metrics"
