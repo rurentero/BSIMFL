@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -54,13 +55,16 @@ public class FirstFragment extends Fragment {
     private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
     private final int features = 54;
     private final int classes = 10;
-    private final double fractionTrain = 0.75;
+    private final double fractionTrain = 0.50;
     private final int epochs = 100;
     private final double lr = 0.015;
     private final double momentum = 0.9;
     private final List<String> labelList = new ArrayList<String>(Arrays.asList("turn off","turn on","Antena3","pop","FDF","70W","TeleCinco","20C","rock","18C"));
 
-
+    // Views
+    TextView tvSteps;
+    TextView tvLog;
+    TextView tvMetrics;
 
     @Override
     public View onCreateView(
@@ -73,6 +77,11 @@ public class FirstFragment extends Fragment {
 
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // Initialize views
+        tvSteps = view.findViewById(R.id.textView_steps);
+        tvLog = view.findViewById(R.id.textView_log);
+        tvMetrics = view.findViewById(R.id.textView_metrics);
 
         view.findViewById(R.id.button_first).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -88,15 +97,18 @@ public class FirstFragment extends Fragment {
             public void run() {
                 // Obtener datos
                 try {
+//                    tvSteps.append("A) Create data source.");
                     createDataSource(ordinalDataFile);
                 } catch (IOException | InterruptedException e) {
                     Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
                     e.printStackTrace();
                 }
                 // Create and train network
+//                tvSteps.append("B) Create and fit network.");
                 createAndUseNetwork();
 
                 // Evaluates network
+//                tvSteps.append("C) Evaluate.");
                 evaluateNetwork();
             }
         });
@@ -106,6 +118,7 @@ public class FirstFragment extends Fragment {
         // Variables
         int seed = 9;
 
+//        tvLog.append("B.1 - Creating layers.");
         Log.i("createAndUseNetwork: ", "1) Creating layers");
         // Layers
         DenseLayer inputLayer = new DenseLayer.Builder()
@@ -131,6 +144,7 @@ public class FirstFragment extends Fragment {
 
         // TODO Cambiar la configuración para mejorar el modelo
         // Configuracion
+//        tvLog.append("B.2 - Creating configuration.");
         Log.i("createAndUseNetwork: ", "2) Creating configuration");
         MultiLayerConfiguration multiLayerConf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
@@ -146,44 +160,55 @@ public class FirstFragment extends Fragment {
                 .build();
 
         // Model
+//        tvLog.append("B.3 - Creating model.");
         Log.i("createAndUseNetwork: ", "3) Creating model");
         model = new MultiLayerNetwork(multiLayerConf);
         model.init();
 
-        // Resumen
+        // Summary
+//        tvLog.append("B.4 - Generating summary.");
         Log.i("createAndUseNetwork: ", "4) Summary");
         Log.i("NETWORK", "createAndUseNetwork: " + model.summary());
+//        tvLog.append(model.summary());
 
         // Training loop
+//        tvLog.append("B.5 - Entering training loop...");
         Log.i("NETWORK", "Entering training loop...");
         for(int l=0; l<=epochs; l++) {
             model.fit(trainingData);
         }
         Log.i("NETWORK", "Training loop finished.");
+//        tvLog.append("B.6 - Training loop finished.");
     }
 
     private void evaluateNetwork() {
+//        tvLog.append("C.1 - Starting evaluation process.");
         Log.i("evaluateNetwork: ", "Starting evaluation process");
         Evaluation eval = new Evaluation(classes);
         eval.setLabelsList(labelList); // Set label literals
 
-        INDArray output = model.output(testData.getFeatures());
-        eval.eval(testData.getLabels(), output);
+        // TODO Revisar esta entrada: actualIdx y
+        INDArray predicted = model.output(testData.getFeatures());
+        INDArray actual = testData.getLabels();
+        eval.eval(actual, predicted);
+//        tvLog.append(eval.stats());
         Log.i("evaluateNetwork: ", eval.stats());
         Log.i("evaluateNetwork: ", "Confusion matrix:\n" + eval.confusionToString());
 
+//        tvLog.append("C.2 - End of evaluation.");
         Log.i("evaluateNetwork: ", "End of evaluation");
     }
 
     private void createDataSource(String dataFile) throws IOException, InterruptedException {
         //Pre: Create input stream
+//        tvLog.append("A.0 - Creating input stream.");
         Log.i("createDataSource: ", "0) Creando input stream");
         Log.i("createDataSource: ", "Ruta: "+dataFile);
         AssetManager am = this.getContext().getAssets();
         InputStream is = am.open(dataFile);
-        Log.i("createDataSource", is.toString());
 
         //First: get the dataset using the record reader. CSVRecordReader handles loading/parsing
+//        tvLog.append("A.1 - Creating record reader.");
         Log.i("createDataSource: ", "1) Creando record reader");
         int numLinesToSkip = 1; // Cabecera
         char delimiter = ',';
@@ -192,6 +217,8 @@ public class FirstFragment extends Fragment {
 
         //Second: the RecordReaderDataSetIterator handles conversion to DataSet objects, ready for use in neural network
         int labelIndex = 0; // Las acciones estan en la primera columna
+
+//        tvLog.append("A.2 - Creating iterator.");
         Log.i("createDataSource: ", "2) Creando iterador");
 
         DataSetIterator iterator = new RecordReaderDataSetIterator.Builder(recordReader, batchSize)
@@ -203,17 +230,19 @@ public class FirstFragment extends Fragment {
         DataSet allData = iterator.next();
 
         // Dividir en train test
+//        tvLog.append("A.3 - Perform train test split.");
         Log.i("createDataSource: ", "3) Test y Train");
         SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(fractionTrain);
 
         trainingData = testAndTrain.getTrain();
         testData = testAndTrain.getTest();
 
+//        tvLog.append("A.4 - Train samples: " + trainingData.numExamples());
+//        tvLog.append("A.4 - Test samples: " + testData.numExamples());
+
         Log.i("createDataSource: ", "Features train: " + trainingData.getFeatures().toString());
         Log.i("createDataSource: ", "Labels train: " + trainingData.getLabels().toString());
         Log.i("createDataSource: ", "N samples train: " + trainingData.numExamples());
-        Log.i("createDataSource: ", "Label Names: " + trainingData.getLabelNames().toString());
-        Log.i("createDataSource: ", "N Examples train: " + trainingData.numExamples());
 
         Log.i("createDataSource: ", "DATASET DE ENTRENAMIENTO: " + trainingData.toString());
         Log.i("createDataSource: ", "DATASET DE TESTEO: " + testData.toString());
@@ -222,4 +251,12 @@ public class FirstFragment extends Fragment {
 
     }
 
+    private void showInStepsView (String msg) {
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvSteps.append(msg);
+            }
+        });
+    }
 }
