@@ -97,7 +97,6 @@ public class FirstFragment extends Fragment {
             public void run() {
                 long startTime = System.nanoTime();
 
-                // TODO Mostrar en la view de Metricas
                 // Obtener datos
                 try {
                     showInStepsView("A) Create data source.");
@@ -195,7 +194,7 @@ public class FirstFragment extends Fragment {
         Evaluation eval = new Evaluation(classes);
         eval.setLabelsList(labelList); // Set label literals
 
-        // TODO Revisar esta entrada: actualIdx y
+        // TODO Revisar esta entrada: Pide los idx, se están pasando realmente los idx o sólo las predicciones? Habria que calcular cada idx?
         INDArray predicted = model.output(testData.getFeatures());
         INDArray actual = testData.getLabels();
         eval.eval(actual, predicted);
