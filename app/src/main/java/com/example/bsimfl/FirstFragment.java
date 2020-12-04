@@ -95,7 +95,8 @@ public class FirstFragment extends Fragment {
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {
-                // TODO Medir el tiempo de ejecución de la async task
+                long startTime = System.nanoTime();
+
                 // TODO Mostrar en la view de Metricas
                 // Obtener datos
                 try {
@@ -112,6 +113,11 @@ public class FirstFragment extends Fragment {
                 // Evaluates network
                 showInStepsView("C) Evaluate.");
                 evaluateNetwork();
+
+                // Calculate time spent
+                long endTime = System.nanoTime();
+                long duration = (endTime - startTime)/1000000 ;  //milliseconds.
+                showInMetricsView("Time spent: " + duration + "ms (~"+ duration/1000 + " s)" );
             }
         });
     }
