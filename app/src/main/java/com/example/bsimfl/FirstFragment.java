@@ -65,7 +65,7 @@ public class FirstFragment extends Fragment {
     TextView tvSteps;
     TextView tvLog;
     TextView tvMetrics;
-    // TODO Cambiar las 3 views que sirven como título, actualmente son textview para meter información por teclado!
+
     @Override
     public View onCreateView(
             LayoutInflater inflater, ViewGroup container,
@@ -210,7 +210,7 @@ public class FirstFragment extends Fragment {
         InputStream is = am.open(dataFile);
 
         //First: get the dataset using the record reader. CSVRecordReader handles loading/parsing
-        showInLogView("A.0 - Creating input stream.");
+        showInLogView("A.1 - Creating record reader.");
         Log.i("createDataSource: ", "A.1 - Creating record reader.");
         int numLinesToSkip = 1; // Cabecera
         char delimiter = ',';
@@ -240,7 +240,7 @@ public class FirstFragment extends Fragment {
         testData = testAndTrain.getTest();
 
         showInLogView("A.4 - Train samples: " + trainingData.numExamples());
-        showInLogView("A.4 - Test samples: " + testData.numExamples());
+        showInLogView("A.5 - Test samples: " + testData.numExamples());
 
         Log.i("createDataSource: ", "Features train: " + trainingData.getFeatures().toString());
         Log.i("createDataSource: ", "Labels train: " + trainingData.getLabels().toString());
