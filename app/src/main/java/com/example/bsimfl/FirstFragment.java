@@ -3,6 +3,7 @@ package com.example.bsimfl;
 import android.content.res.AssetManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,6 +26,7 @@ import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.evaluation.classification.Evaluation;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -34,6 +36,7 @@ import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -49,10 +52,12 @@ public class FirstFragment extends Fragment {
     private final String file_x_test = "data/x_test/" + dataFile;
     private final String file_y_train = "data/y_train/" + dataFile;
     private final String file_y_test = "data/y_test/" + dataFile;
+    private final String modelDir = "model/";
     DataSet trainingData;
     DataSet testData;
     MultiLayerNetwork model;
     private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
+    private int saveModelInterval = 10; // Cada cuantas epochs se guarda el modelo para su envío al server
     private final int features = 54;
     private final int classes = 10;
     private final double fractionTrain = 0.50;
@@ -66,6 +71,9 @@ public class FirstFragment extends Fragment {
     TextView tvLog;
     TextView tvMetrics;
 
+    // TODO Crear una variable modelGlobal, un metodo que descargue un modelo desde el servidor y lo cargue en memoria
+    //  mediante transfer learning. (Se puede dejar un modelo cualquiera en el servidor para la simulación, y
+    //  aqui reentrenar con algunas epochs y volver a subir).
     @Override
     public View onCreateView(
             LayoutInflater inflater, ViewGroup container,
@@ -183,9 +191,27 @@ public class FirstFragment extends Fragment {
         Log.i("NETWORK", "Entering training loop...");
         for(int l=0; l<=epochs; l++) {
             model.fit(trainingData);
+            // Saves model every N epochs
+            if (l>0 && l%saveModelInterval==0){
+                //File file = new File(modelDir + dataFile + "_" + l);
+                String filename = dataFile + "_" + l;
+                serializeModel(model, filename);
+                // TODO Recuperar, enviar y eliminar
+            }
         }
         Log.i("NETWORK", "Training loop finished.");
         showInLogView("B.6 - Training loop finished.");
+
+        // TODO Solo como comprobación: Models saved during training loop
+        // Usar el getFilesDir --> File file = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
+//        String[] files = this.getContext().fileList();
+//        showInLogView("B.7 - Updates internally stored:");
+//        for (String update: files) {
+//            File file = new File(update);
+//            String file_size = Formatter.formatShortFileSize(this.getContext(),file.length());
+//            showInLogView("-- " + update + " -> " + file_size);
+//        }
+
     }
 
     private void evaluateNetwork() {
@@ -195,6 +221,7 @@ public class FirstFragment extends Fragment {
         eval.setLabelsList(labelList); // Set label literals
 
         // TODO Revisar esta entrada: Pide los idx, se están pasando realmente los idx o sólo las predicciones? Habria que calcular cada idx?
+        //  Se supone que está bien implementado, aunque la precisión del modelo es pesima.
         INDArray predicted = model.output(testData.getFeatures());
         INDArray actual = testData.getLabels();
         eval.eval(actual, predicted);
@@ -255,6 +282,26 @@ public class FirstFragment extends Fragment {
         Log.i("createDataSource: ", "DATASET DE TESTEO: " + testData.toString());
 
         Log.i("createDataSource: ", "Fin de la carga.");
+
+    }
+
+    /***
+     * Serializes a model and save it in internal storage (accessible only for this app)
+     * @param model
+     */
+    private void serializeModel(MultiLayerNetwork model, String filename){
+
+        try {
+            // Save file
+            File file = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
+            model.save(file);
+            // Show file/size on log
+            String file_size = Formatter.formatShortFileSize(this.getContext(),file.length());
+            showInLogView("-- " + filename + " -> " + file_size);
+        } catch (IOException e) {
+            Log.e("serializeModel: ", "Error in model serialization.");
+            e.printStackTrace();
+        }
 
     }
 
