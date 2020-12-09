@@ -62,6 +62,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class FirstFragment extends Fragment {
 
     private final String apiBaseUrl = "http://localhost"; // TODO poner la API real
+    private final String globalModelFile = "global_last";
     private final String dataFile = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1.csv";
     private final String ordinalDataFile = "data/ordinal/" + dataFile;
     private final String oneHotDataFile = "data/one_hot/" + dataFile; // Labels empiezan en col 55
@@ -88,7 +89,7 @@ public class FirstFragment extends Fragment {
     TextView tvSteps;
     TextView tvLog;
     TextView tvMetrics;
-    
+
     @Override
     public View onCreateView(
             LayoutInflater inflater, ViewGroup container,
@@ -224,12 +225,15 @@ public class FirstFragment extends Fragment {
                 String filename = dataFile + "_" + l + "_global";
                 serializeModel(globalModel, filename);
                 // TODO probar todo el proceso
+                Log.i("NETWORK", "Uploading model");
                 // TODO Peticion post (ya carga el fichero gracias al filename)
 //                uploadFile(filename);
                 // TODO eliminar fichero?
                 // TODO Petición get
+                Log.i("NETWORK", "Downloading new model");
 //                downloadGlobalModel();
                 // TODO Sobrescribir la instancia con Transfer learning
+                Log.i("NETWORK", "Deserialize and transfer learning");
 //                globalModel = transferLearning(globalModel, multiLayerConf);
             }
         }
@@ -238,17 +242,17 @@ public class FirstFragment extends Fragment {
 
     }
 
+    // TODO Probar
     /***
      * Performs Transfer Learning and generates a new model.
-     * @param model
      * @param config
      * @return
      */
-    private MultiLayerNetwork transferLearning(MultiLayerNetwork model, MultiLayerConfiguration config){
-        MultiLayerNetwork newModel = new TransferLearning.Builder(model)
+    private MultiLayerNetwork transferLearning(MultiLayerConfiguration config){
+        MultiLayerNetwork oldModel = deserializeModel(globalModelFile);
+        return new TransferLearning.Builder(oldModel)
                 .setFeatureExtractor(0)
                 .build();
-        return newModel;
     }
 
     private void evaluateNetwork(MultiLayerNetwork network) {
@@ -334,12 +338,34 @@ public class FirstFragment extends Fragment {
             model.save(file);
             // Show file/size on log
             String file_size = Formatter.formatShortFileSize(this.getContext(),file.length());
-            showInLogView("-- " + filename + " -> " + file_size);
+            showInLogView("--Saved: " + filename + " -> " + file_size);
         } catch (IOException e) {
             Log.e("serializeModel: ", "Error in model serialization.");
             e.printStackTrace();
         }
 
+    }
+
+    // TODO Probar
+    /***
+     * Deserializes a model from internal storage into a variable
+     * If newModel is null, it means something went wrong during deserialization.
+     * @param filename path to file
+     */
+    private MultiLayerNetwork deserializeModel(String filename){
+        MultiLayerNetwork newModel = null;
+        try {
+            // Load file
+            File file = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
+            newModel = MultiLayerNetwork.load(file, true);
+            // Show file/size on log
+            String file_size = Formatter.formatShortFileSize(this.getContext(),file.length());
+            showInLogView("--Loaded: " + filename + " -> " + file_size);
+        } catch (IOException e) {
+            Log.e("deserializeModel: ", "Error in model deserialization.");
+            e.printStackTrace();
+        }
+        return newModel;
     }
 
     private void showInStepsView (String msg) {
@@ -473,7 +499,7 @@ public class FirstFragment extends Fragment {
     private boolean writeResponseBodyToDisk(ResponseBody body) {
         try {
             // File destination
-            File file = new File(this.getContext().getFilesDir().getPath() + File.separator + "global_last");
+            File file = new File(this.getContext().getFilesDir().getPath() + File.separator + globalModelFile);
 
             InputStream inputStream = null;
             OutputStream outputStream = null;
