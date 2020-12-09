@@ -1,6 +1,7 @@
 package com.example.bsimfl;
 
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.format.Formatter;
@@ -14,6 +15,8 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
+import com.example.bsimfl.utils.FileUploadService;
+
 import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
 import org.datavec.api.split.InputStreamInputSplit;
@@ -25,6 +28,7 @@ import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.transferlearning.TransferLearning;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.evaluation.classification.Evaluation;
@@ -37,14 +41,27 @@ import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
 public class FirstFragment extends Fragment {
 
+    private final String apiBaseUrl = "http://localhost"; // TODO poner la API real
     private final String dataFile = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1.csv";
     private final String ordinalDataFile = "data/ordinal/" + dataFile;
     private final String oneHotDataFile = "data/one_hot/" + dataFile; // Labels empiezan en col 55
@@ -56,8 +73,9 @@ public class FirstFragment extends Fragment {
     DataSet trainingData;
     DataSet testData;
     MultiLayerNetwork model;
+    MultiLayerNetwork globalModel;
     private final int batchSize = 100 ; // Nº de elementos cargados en cada iteración. 100 para tomar el dataset completo
-    private int saveModelInterval = 10; // Cada cuantas epochs se guarda el modelo para su envío al server
+    private int saveModelInterval = 10; // Cada cuantas epochs se guarda el modelo global para su envío al server
     private final int features = 54;
     private final int classes = 10;
     private final double fractionTrain = 0.50;
@@ -70,10 +88,7 @@ public class FirstFragment extends Fragment {
     TextView tvSteps;
     TextView tvLog;
     TextView tvMetrics;
-
-    // TODO Crear una variable modelGlobal, un metodo que descargue un modelo desde el servidor y lo cargue en memoria
-    //  mediante transfer learning. (Se puede dejar un modelo cualquiera en el servidor para la simulación, y
-    //  aqui reentrenar con algunas epochs y volver a subir).
+    
     @Override
     public View onCreateView(
             LayoutInflater inflater, ViewGroup container,
@@ -118,8 +133,10 @@ public class FirstFragment extends Fragment {
                 createAndUseNetwork();
 
                 // Evaluates network
-                showInStepsView("C) Evaluate.");
-                evaluateNetwork();
+                showInStepsView("C) Evaluate local network.");
+                evaluateNetwork(model);
+                showInStepsView("D) Evaluate global network.");
+                evaluateNetwork(globalModel);
 
                 // Calculate time spent
                 long endTime = System.nanoTime();
@@ -174,55 +191,75 @@ public class FirstFragment extends Fragment {
                 .backpropType(BackpropType.Standard) // For most MLPs
                 .build();
 
-        // Model
-        showInLogView("B.3 - Creating model.");
-        Log.i("createAndUseNetwork: ", "3) Creating model");
+        // Local model
+        showInLogView("B.3.1 - Creating local model.");
+        Log.i("createAndUseNetwork: ", "3) Creating local model");
         model = new MultiLayerNetwork(multiLayerConf);
         model.init();
 
+        // Global model (first initialization
+        showInLogView("B.3.2 - Creating global model.");
+        Log.i("createAndUseNetwork: ", "4) Creating global model");
+        globalModel = new MultiLayerNetwork(multiLayerConf);
+        globalModel.init();
+
         // Summary
         showInLogView("B.4 - Generating summary.");
-        Log.i("createAndUseNetwork: ", "4) Summary");
+        Log.i("createAndUseNetwork: ", "5) Summary");
         Log.i("NETWORK", "createAndUseNetwork: " + model.summary());
 //        tvLog.append(model.summary());
 
-        // Training loop
+        // Training loop for local model
         showInLogView("B.5 - Entering training loop...");
         Log.i("NETWORK", "Entering training loop...");
         for(int l=0; l<=epochs; l++) {
+            // Train local model as usual
             model.fit(trainingData);
+
+            // Train global model
+            globalModel.fit(trainingData);
             // Saves model every N epochs
             if (l>0 && l%saveModelInterval==0){
                 //File file = new File(modelDir + dataFile + "_" + l);
-                String filename = dataFile + "_" + l;
-                serializeModel(model, filename);
-                // TODO Recuperar, enviar y eliminar
+                String filename = dataFile + "_" + l + "_global";
+                serializeModel(globalModel, filename);
+                // TODO probar todo el proceso
+                // TODO Peticion post (ya carga el fichero gracias al filename)
+//                uploadFile(filename);
+                // TODO eliminar fichero?
+                // TODO Petición get
+//                downloadGlobalModel();
+                // TODO Sobrescribir la instancia con Transfer learning
+//                globalModel = transferLearning(globalModel, multiLayerConf);
             }
         }
         Log.i("NETWORK", "Training loop finished.");
         showInLogView("B.6 - Training loop finished.");
 
-        // TODO Solo como comprobación: Models saved during training loop
-        // Usar el getFilesDir --> File file = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
-//        String[] files = this.getContext().fileList();
-//        showInLogView("B.7 - Updates internally stored:");
-//        for (String update: files) {
-//            File file = new File(update);
-//            String file_size = Formatter.formatShortFileSize(this.getContext(),file.length());
-//            showInLogView("-- " + update + " -> " + file_size);
-//        }
-
     }
 
-    private void evaluateNetwork() {
-        showInLogView("C.1 - Starting evaluation process.");
+    /***
+     * Performs Transfer Learning and generates a new model.
+     * @param model
+     * @param config
+     * @return
+     */
+    private MultiLayerNetwork transferLearning(MultiLayerNetwork model, MultiLayerConfiguration config){
+        MultiLayerNetwork newModel = new TransferLearning.Builder(model)
+                .setFeatureExtractor(0)
+                .build();
+        return newModel;
+    }
+
+    private void evaluateNetwork(MultiLayerNetwork network) {
+        showInLogView("Starting evaluation process.");
         Log.i("evaluateNetwork: ", "Starting evaluation process");
         Evaluation eval = new Evaluation(classes);
         eval.setLabelsList(labelList); // Set label literals
 
         // TODO Revisar esta entrada: Pide los idx, se están pasando realmente los idx o sólo las predicciones? Habria que calcular cada idx?
         //  Se supone que está bien implementado, aunque la precisión del modelo es pesima.
-        INDArray predicted = model.output(testData.getFeatures());
+        INDArray predicted = network.output(testData.getFeatures());
         INDArray actual = testData.getLabels();
         eval.eval(actual, predicted);
         showInLogView(eval.stats());
@@ -330,5 +367,156 @@ public class FirstFragment extends Fragment {
                 tvMetrics.append(msg + "\n");
             }
         });
+    }
+
+    //TODO Probar
+    /***
+     * Uploads local model to server
+     * @param filename
+     */
+    private void uploadFile(String filename) {
+
+        // https://github.com/iPaulPro/aFileChooser/blob/master/aFileChooser/src/com/ipaulpro/afilechooser/utils/FileUtils.java
+        // use the FileUtils to get the actual file by uri
+        // TODO obtener fichero
+        //File file = FileUtils.getFile(this, fileUri);
+        File originalFile = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
+
+        // create RequestBody instance from file
+        RequestBody filePart =
+                RequestBody.create(
+                        MultipartBody.FORM,
+                        originalFile
+                );
+
+        // MultipartBody.Part is used to send also the actual file name (multipart necesita un wrapper adicional)
+        MultipartBody.Part body =
+                MultipartBody.Part.createFormData("model", originalFile.getName(), filePart);
+
+        // Description part. add another part within the multipart request
+        String descriptionString = "hello, this is description speaking";
+        RequestBody description =
+                RequestBody.create(
+                        okhttp3.MultipartBody.FORM, descriptionString);
+
+        // Create Retrofit instance (service)
+        Retrofit.Builder builder = new Retrofit.Builder()
+                .baseUrl(apiBaseUrl)
+                .addConverterFactory(GsonConverterFactory.create());
+
+        Retrofit retrofit = builder.build();
+
+        // Apply our interface
+        FileUploadService service = retrofit.create(FileUploadService.class);
+
+        // finally, execute the request
+        Call<ResponseBody> call = service.upload(description, body);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call,
+                                   Response<ResponseBody> response) {
+                Log.v("uploadFile:", "Upload success");
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                Log.e("uploadFile:", "Upload error: " + t.getMessage());
+            }
+        });
+    }
+
+    //TODO Probar
+    /***
+     * Downloads global model from server
+     */
+    private void downloadGlobalModel() {
+
+        // Create Retrofit instance (service)
+        Retrofit.Builder builder = new Retrofit.Builder()
+                .baseUrl(apiBaseUrl)
+                .addConverterFactory(GsonConverterFactory.create());
+
+        Retrofit retrofit = builder.build();
+
+        // Apply our interface
+        FileUploadService service = retrofit.create(FileUploadService.class);
+
+        // Request
+        Call<ResponseBody> call = service.downloadGlobalModel();
+
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                if (response.isSuccessful()) {
+                    Log.d("downloadGlobalModel: ", "server contacted and has file");
+
+                    boolean writtenToDisk = writeResponseBodyToDisk(response.body());
+
+                    Log.d("downloadGlobalModel: ", "file download was a success? " + writtenToDisk);
+                } else {
+                    Log.d("downloadGlobalModel: ", "server contact failed");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                Log.e("downloadGlobalModel: ", "error");
+            }
+        });
+    }
+
+    /***
+     * Writes a response body to internal storage
+     * @param body
+     * @return
+     */
+    private boolean writeResponseBodyToDisk(ResponseBody body) {
+        try {
+            // File destination
+            File file = new File(this.getContext().getFilesDir().getPath() + File.separator + "global_last");
+
+            InputStream inputStream = null;
+            OutputStream outputStream = null;
+
+            try {
+                byte[] fileReader = new byte[4096];
+
+                long fileSize = body.contentLength();
+                long fileSizeDownloaded = 0;
+
+                inputStream = body.byteStream();
+                outputStream = new FileOutputStream(file);
+
+                while (true) {
+                    int read = inputStream.read(fileReader);
+
+                    if (read == -1) {
+                        break;
+                    }
+
+                    outputStream.write(fileReader, 0, read);
+
+                    fileSizeDownloaded += read;
+
+                    Log.d("writeResponseBodyToDisk:", "file download: " + fileSizeDownloaded + " of " + fileSize);
+                }
+
+                outputStream.flush();
+
+                return true;
+            } catch (IOException e) {
+                return false;
+            } finally {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+
+                if (outputStream != null) {
+                    outputStream.close();
+                }
+            }
+        } catch (IOException e) {
+            return false;
+        }
     }
 }
