@@ -1,7 +1,6 @@
 package com.example.bsimfl;
 
 import android.content.res.AssetManager;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.format.Formatter;
@@ -30,7 +29,6 @@ import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.transferlearning.TransferLearning;
 import org.deeplearning4j.nn.weights.WeightInit;
-import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.evaluation.classification.Evaluation;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -49,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
@@ -61,9 +58,10 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class FirstFragment extends Fragment {
 
-    private final String apiBaseUrl = "http://localhost"; // TODO poner la API real
-    private final String globalModelFile = "global_last";
-    private final String dataFile = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1.csv";
+    private final String apiBaseUrl = "http://192.168.1.38:5000/"; // TODO poner la API real
+    private final String globalModelFile = "model_global";
+    private final String dataFileName = "a7ddfb7f-c221-4d5b-a5c2-9f5e289269e1";
+    private final String dataFile = dataFileName + ".csv";
     private final String ordinalDataFile = "data/ordinal/" + dataFile;
     private final String oneHotDataFile = "data/one_hot/" + dataFile; // Labels empiezan en col 55
     private final String file_x_train = "data/x_train/" + dataFile;
@@ -222,19 +220,18 @@ public class FirstFragment extends Fragment {
             // Saves model every N epochs
             if (l>0 && l%saveModelInterval==0){
                 //File file = new File(modelDir + dataFile + "_" + l);
-                String filename = dataFile + "_" + l + "_global";
+                String filename = dataFileName + "_" + l + "_global";
                 serializeModel(globalModel, filename);
-                // TODO probar todo el proceso
+                // Upload file to server
                 Log.i("NETWORK", "Uploading model");
-                // TODO Peticion post (ya carga el fichero gracias al filename)
-//                uploadFile(filename);
-                // TODO eliminar fichero?
-                // TODO Petición get
+                uploadFile(filename);
+                // TODO eliminar ficheros no usados en la memoria
+                // Downloading global model
                 Log.i("NETWORK", "Downloading new model");
-//                downloadGlobalModel();
-                // TODO Sobrescribir la instancia con Transfer learning
+                downloadGlobalModel();
+                // Create new instance of global model using Transfer Learning
                 Log.i("NETWORK", "Deserialize and transfer learning");
-//                globalModel = transferLearning(globalModel, multiLayerConf);
+                globalModel = transferLearning(multiLayerConf);
             }
         }
         Log.i("NETWORK", "Training loop finished.");
@@ -242,7 +239,6 @@ public class FirstFragment extends Fragment {
 
     }
 
-    // TODO Probar
     /***
      * Performs Transfer Learning and generates a new model.
      * @param config
@@ -262,7 +258,7 @@ public class FirstFragment extends Fragment {
         eval.setLabelsList(labelList); // Set label literals
 
         // TODO Revisar esta entrada: Pide los idx, se están pasando realmente los idx o sólo las predicciones? Habria que calcular cada idx?
-        //  Se supone que está bien implementado, aunque la precisión del modelo es pesima.
+        //  Se supone que está bien implementado, aunque la precisión del modelo es pesima (culpa de librería?)
         INDArray predicted = network.output(testData.getFeatures());
         INDArray actual = testData.getLabels();
         eval.eval(actual, predicted);
@@ -346,7 +342,6 @@ public class FirstFragment extends Fragment {
 
     }
 
-    // TODO Probar
     /***
      * Deserializes a model from internal storage into a variable
      * If newModel is null, it means something went wrong during deserialization.
@@ -395,7 +390,6 @@ public class FirstFragment extends Fragment {
         });
     }
 
-    //TODO Probar
     /***
      * Uploads local model to server
      * @param filename
@@ -404,7 +398,7 @@ public class FirstFragment extends Fragment {
 
         // https://github.com/iPaulPro/aFileChooser/blob/master/aFileChooser/src/com/ipaulpro/afilechooser/utils/FileUtils.java
         // use the FileUtils to get the actual file by uri
-        // TODO obtener fichero
+
         //File file = FileUtils.getFile(this, fileUri);
         File originalFile = new File(this.getContext().getFilesDir().getPath() + "/"+ filename);
 
@@ -415,9 +409,9 @@ public class FirstFragment extends Fragment {
                         originalFile
                 );
 
-        // MultipartBody.Part is used to send also the actual file name (multipart necesita un wrapper adicional)
+        // File Key - Value. MultipartBody.Part is used to send also the actual file name (multipart necesita un wrapper adicional)
         MultipartBody.Part body =
-                MultipartBody.Part.createFormData("model", originalFile.getName(), filePart);
+                MultipartBody.Part.createFormData("file", originalFile.getName(), filePart);
 
         // Description part. add another part within the multipart request
         String descriptionString = "hello, this is description speaking";
@@ -441,7 +435,7 @@ public class FirstFragment extends Fragment {
             @Override
             public void onResponse(Call<ResponseBody> call,
                                    Response<ResponseBody> response) {
-                Log.v("uploadFile:", "Upload success");
+                Log.i("uploadFile:", "Upload success");
             }
 
             @Override
@@ -451,7 +445,6 @@ public class FirstFragment extends Fragment {
         });
     }
 
-    //TODO Probar
     /***
      * Downloads global model from server
      */
@@ -470,25 +463,40 @@ public class FirstFragment extends Fragment {
         // Request
         Call<ResponseBody> call = service.downloadGlobalModel();
 
-        call.enqueue(new Callback<ResponseBody>() {
-            @Override
-            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                if (response.isSuccessful()) {
-                    Log.d("downloadGlobalModel: ", "server contacted and has file");
-
-                    boolean writtenToDisk = writeResponseBodyToDisk(response.body());
-
-                    Log.d("downloadGlobalModel: ", "file download was a success? " + writtenToDisk);
-                } else {
-                    Log.d("downloadGlobalModel: ", "server contact failed");
-                }
+        Response<ResponseBody> response = null;
+        try {
+            response = call.execute();
+            if (response.isSuccessful()) {
+                Log.i("downloadGlobalModel: ", "server contacted and has file");
+                boolean writtenToDisk = writeResponseBodyToDisk(response.body());
+                Log.i("downloadGlobalModel: ", "file download was a success? " + writtenToDisk);
+            }else{
+                Log.e("downloadGlobalModel: ", "server contact failed");
             }
-
-            @Override
-            public void onFailure(Call<ResponseBody> call, Throwable t) {
-                Log.e("downloadGlobalModel: ", "error");
-            }
-        });
+        } catch (IOException e) {
+            Log.e("downloadGlobalModel: ", "error");
+            e.printStackTrace();
+        }
+//         // Metodo asincrono con el enqueue (en FL debe ser sincrono)
+//        call.enqueue(new Callback<ResponseBody>() {
+//            @Override
+//            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+//                if (response.isSuccessful()) {
+//                    Log.i("downloadGlobalModel: ", "server contacted and has file");
+//
+//                    boolean writtenToDisk = writeResponseBodyToDisk(response.body());
+//
+//                    Log.i("downloadGlobalModel: ", "file download was a success? " + writtenToDisk);
+//                } else {
+////                    Log.e("downloadGlobalModel: ", "server contact failed");
+////                }
+//            }
+//
+//            @Override
+//            public void onFailure(Call<ResponseBody> call, Throwable t) {
+//                Log.e("downloadGlobalModel: ", "error");
+//            }
+//        });
     }
 
     /***
@@ -499,7 +507,7 @@ public class FirstFragment extends Fragment {
     private boolean writeResponseBodyToDisk(ResponseBody body) {
         try {
             // File destination
-            File file = new File(this.getContext().getFilesDir().getPath() + File.separator + globalModelFile);
+            File file = new File(this.getContext().getFilesDir().getPath() + "/" + globalModelFile);
 
             InputStream inputStream = null;
             OutputStream outputStream = null;
@@ -524,13 +532,14 @@ public class FirstFragment extends Fragment {
 
                     fileSizeDownloaded += read;
 
-                    Log.d("writeResponseBodyToDisk:", "file download: " + fileSizeDownloaded + " of " + fileSize);
+                    Log.i("writeResponseBodyToDisk:", "file download: " + fileSizeDownloaded + " of " + fileSize);
                 }
 
                 outputStream.flush();
 
                 return true;
             } catch (IOException e) {
+                e.printStackTrace();
                 return false;
             } finally {
                 if (inputStream != null) {
@@ -542,6 +551,7 @@ public class FirstFragment extends Fragment {
                 }
             }
         } catch (IOException e) {
+            e.printStackTrace();
             return false;
         }
     }
