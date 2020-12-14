@@ -108,41 +108,44 @@ public class FirstFragment extends Fragment {
         view.findViewById(R.id.button_first).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                NavHostFragment.findNavController(FirstFragment.this)
-                        .navigate(R.id.action_FirstFragment_to_SecondFragment);
+                // Ejecutarla al pulsar el botón
+                // Async task para la NN
+                AsyncTask.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        long startTime = System.nanoTime();
+
+                        // Obtener datos
+                        try {
+                            showInStepsView("A) Create data source.");
+                            createDataSource(ordinalDataFile);
+                        } catch (IOException | InterruptedException e) {
+                            Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
+                            e.printStackTrace();
+                        }
+                        // Create and train network
+                        showInStepsView("B) Create and fit network.");
+                        createAndUseNetwork();
+
+                        // Evaluates network
+                        showInStepsView("C) Evaluate local network.");
+                        evaluateNetwork(model);
+                        showInStepsView("D) Evaluate global network.");
+                        evaluateNetwork(globalModel);
+
+                        // Calculate time spent
+                        long endTime = System.nanoTime();
+                        long duration = (endTime - startTime)/1000000 ;  //milliseconds.
+                        showInMetricsView("Time spent: " + duration + "ms (~"+ duration/1000 + " s)" );
+                    }
+                });
+//                // Old behaviour
+//                NavHostFragment.findNavController(FirstFragment.this)
+//                        .navigate(R.id.action_FirstFragment_to_SecondFragment);
             }
         });
 
-        // Async task para la NN
-        AsyncTask.execute(new Runnable() {
-            @Override
-            public void run() {
-                long startTime = System.nanoTime();
 
-                // Obtener datos
-                try {
-                    showInStepsView("A) Create data source.");
-                    createDataSource(ordinalDataFile);
-                } catch (IOException | InterruptedException e) {
-                    Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
-                    e.printStackTrace();
-                }
-                // Create and train network
-                showInStepsView("B) Create and fit network.");
-                createAndUseNetwork();
-
-                // Evaluates network
-                showInStepsView("C) Evaluate local network.");
-                evaluateNetwork(model);
-                showInStepsView("D) Evaluate global network.");
-                evaluateNetwork(globalModel);
-
-                // Calculate time spent
-                long endTime = System.nanoTime();
-                long duration = (endTime - startTime)/1000000 ;  //milliseconds.
-                showInMetricsView("Time spent: " + duration + "ms (~"+ duration/1000 + " s)" );
-            }
-        });
     }
 
     private void createAndUseNetwork() {
