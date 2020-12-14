@@ -105,6 +105,31 @@ public class FirstFragment extends Fragment {
         tvLog = view.findViewById(R.id.textView_log);
         tvMetrics = view.findViewById(R.id.textView_metrics);
 
+        // Load data source part
+        view.findViewById(R.id.button_load).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // Ejecutarla al pulsar el botón
+                // Async task para la NN
+                AsyncTask.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        long startTime = System.nanoTime();
+
+                        // Obtener datos
+                        try {
+                            showInStepsView("A) Create data source.");
+                            createDataSource(ordinalDataFile);
+                        } catch (IOException | InterruptedException e) {
+                            Log.e("CARGA", "Algo ha ido mal en la carga de datos.");
+                            e.printStackTrace();
+                        }
+                    }
+                });
+            }
+        });
+
+        // Training part
         view.findViewById(R.id.button_first).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
